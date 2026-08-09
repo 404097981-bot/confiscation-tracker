@@ -87,13 +87,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
       <input type="text" id="inputItem" placeholder="如：手机、充电宝、零食" autocomplete="off">
     </div>
     <div class="form-row">
-      <label>没收时长</label>
-      <select id="inputDuration">
-        <option value="24">24小时</option>
-        <option value="48">48小时</option>
-        <option value="72" selected>72小时（3天）</option>
-        <option value="168">168小时（一周）</option>
-      </select>
+      <label>没收日期</label>
+      <input type="date" id="inputDate" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>归还日期（归还截止日 17:40）</label>
+      <input type="date" id="inputReturnDate" autocomplete="off">
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="toggleForm()">取消</button>
@@ -120,8 +119,6 @@ let records = [];
 let showAll = false;
 let formVisible = false;
 
-const DURATION_LABELS = {24: "24小时", 48: "48小时", 72: "72小时", 168: "168小时(一周)"};
-
 function toggleForm() {
   formVisible = !formVisible;
   document.getElementById("formCard").style.display = formVisible ? "block" : "none";
@@ -130,7 +127,11 @@ function toggleForm() {
     document.getElementById("inputName").value = "";
     document.getElementById("inputId").value = "";
     document.getElementById("inputItem").value = "";
+    document.getElementById("inputDate").value = "";
+    document.getElementById("inputReturnDate").value = "";
   } else {
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("inputDate").value = today;
     document.getElementById("inputName").focus();
   }
 }
@@ -139,10 +140,15 @@ async function submitRecord() {
   const student_name = document.getElementById("inputName").value.trim();
   const student_id = document.getElementById("inputId").value.trim();
   const item_name = document.getElementById("inputItem").value.trim();
-  const duration_hours = parseInt(document.getElementById("inputDuration").value);
+  const confiscated_at = document.getElementById("inputDate").value;
+  const return_date = document.getElementById("inputReturnDate").value;
 
   if (!student_name || !student_id || !item_name) {
     showToast("请填写所有必填信息");
+    return;
+  }
+  if (!confiscated_at || !return_date) {
+    showToast("请选择日期");
     return;
   }
 
@@ -150,7 +156,7 @@ async function submitRecord() {
     const resp = await fetch("/api/records", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({student_name, student_id, item_name, duration_hours})
+      body: JSON.stringify({student_name, student_id, item_name, confiscated_at, return_date})
     });
     if (resp.ok) {
       toggleForm();
@@ -220,8 +226,8 @@ function renderRecords() {
       return `<div class="record-card ${cls}" id="card-${r.id}">
         <div class="record-info">
           <div class="record-name">${esc(r.student_name)}</div>
-          <div class="record-item">${esc(r.item_name)} · ${DURATION_LABELS[r.duration_hours] || r.duration_hours + "小时"}</div>
-          <div class="record-id">学号: ${esc(r.student_id)} · ${r.confiscated_at}</div>
+          <div class="record-item">${esc(r.item_name)}</div>
+          <div class="record-id">${esc(r.confiscated_at)} ~ ${esc(r.return_date)} · 学号: ${esc(r.student_id)}</div>
         </div>
         <div class="record-timer">${display}</div>
         ${r.status === "active" ? '<button class="btn-return" onclick="markReturned(' + r.id + ')">已归还</button>' : '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>'}

@@ -27,12 +27,16 @@ def init_db():
                 student_id TEXT NOT NULL,
                 item_name TEXT NOT NULL,
                 confiscated_at TEXT NOT NULL,
+                return_date TEXT NOT NULL DEFAULT '',
                 return_at TEXT NOT NULL,
-                duration_hours INTEGER NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
             )
         """)
+        try:
+            conn.execute("ALTER TABLE records ADD COLUMN return_date TEXT NOT NULL DEFAULT ''")
+        except:
+            pass
 
 
 init_db()
@@ -63,19 +67,20 @@ def create_record():
     student_name = data.get("student_name", "").strip()
     student_id = data.get("student_id", "").strip()
     item_name = data.get("item_name", "").strip()
-    duration_hours = data.get("duration_hours", 72)
+    confiscated_at = data.get("confiscated_at", "").strip()
+    return_date = data.get("return_date", "").strip()
 
     if not student_name or not student_id or not item_name:
         return jsonify({"error": "请填写完整信息"}), 400
+    if not confiscated_at or not return_date:
+        return jsonify({"error": "请选择日期"}), 400
 
-    now = datetime.now()
-    return_at = now + timedelta(hours=duration_hours)
+    return_at = return_date + " 17:40"
 
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO records (student_name, student_id, item_name, confiscated_at, return_at, duration_hours) VALUES (?, ?, ?, ?, ?, ?)",
-            (student_name, student_id, item_name, now.strftime("%Y-%m-%d %H:%M:%S"),
-             return_at.strftime("%Y-%m-%d %H:%M:%S"), duration_hours)
+            "INSERT INTO records (student_name, student_id, item_name, confiscated_at, return_date, return_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (student_name, student_id, item_name, confiscated_at, return_date, return_at)
         )
         record = conn.execute("SELECT * FROM records WHERE id=?", (cursor.lastrowid,)).fetchone()
 
@@ -100,22 +105,20 @@ def export_xlsx():
     ws = wb.active
     ws.title = "没收记录"
 
-    headers = ["序号", "学生姓名", "学号", "物品名称", "没收时间", "应归还时间", "没收时长", "状态"]
+    headers = ["序号", "学生姓名", "学号", "物品名称", "没收日期", "归还日期", "归还截止时间", "状态"]
     ws.append(headers)
 
     status_map = {"active": "未归还", "returned": "已归还"}
-    duration_map = {24: "24小时", 48: "48小时", 72: "72小时", 168: "一周"}
 
     for i, row in enumerate(rows, 1):
-        dur_label = duration_map.get(row["duration_hours"], f"{row['duration_hours']}小时")
         ws.append([
             i,
             row["student_name"],
             row["student_id"],
             row["item_name"],
             row["confiscated_at"],
+            row["return_date"],
             row["return_at"],
-            dur_label,
             status_map.get(row["status"], row["status"])
         ])
 
@@ -123,9 +126,9 @@ def export_xlsx():
     ws.column_dimensions["B"].width = 14
     ws.column_dimensions["C"].width = 14
     ws.column_dimensions["D"].width = 18
-    ws.column_dimensions["E"].width = 22
-    ws.column_dimensions["F"].width = 22
-    ws.column_dimensions["G"].width = 12
+    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["F"].width = 16
+    ws.column_dimensions["G"].width = 20
     ws.column_dimensions["H"].width = 10
 
     output = BytesIO()
