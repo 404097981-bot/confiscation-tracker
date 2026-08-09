@@ -85,7 +85,7 @@ def create_record():
 
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO records (student_name, student_id, item_name, reason, confiscated_at, return_date, return_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO records (student_name, student_id, item_name, reason, confiscated_at, return_date, return_at, duration_hours) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
             (student_name, student_id, item_name, reason, confiscated_at, return_date, return_at)
         )
         record = conn.execute("SELECT * FROM records WHERE id=?", (cursor.lastrowid,)).fetchone()
