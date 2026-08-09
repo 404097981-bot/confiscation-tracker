@@ -116,7 +116,8 @@ def adjust_record(record_id):
 
         from datetime import datetime as dt
         try:
-            new_return_date = dt.strptime(row["return_date"], "%Y-%m-%d") + timedelta(days=delta)
+            return_date_str = row["return_date"] if row["return_date"] else row["return_at"][:10]
+            new_return_date = dt.strptime(return_date_str, "%Y-%m-%d") + timedelta(days=delta)
         except:
             return jsonify({"error": "日期解析失败"}), 400
 
