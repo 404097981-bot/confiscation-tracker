@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>违禁品倒计时</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+.header { background: #d32f2f; color: #fff; padding: 14px 16px; text-align: center; font-size: 18px; font-weight: 700; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
+.header .sub { font-size: 12px; font-weight: 400; opacity: 0.9; margin-top: 2px; }
+
+.container { max-width: 600px; margin: 0 auto; padding: 12px 10px 80px; }
+
+.form-toggle { width: 100%; padding: 12px; background: #fff; border: 2px dashed #ccc; border-radius: 10px; color: #666; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
+.form-toggle:hover { border-color: #d32f2f; color: #d32f2f; }
+
+.form-card { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.form-card h3 { font-size: 16px; margin-bottom: 12px; color: #d32f2f; }
+.form-row { margin-bottom: 10px; }
+.form-row label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+.form-row input, .form-row select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; -webkit-appearance: none; }
+.form-row input:focus, .form-row select:focus { border-color: #d32f2f; }
+.btn-row { display: flex; gap: 8px; }
+.btn { flex: 1; padding: 11px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-primary { background: #d32f2f; color: #fff; }
+.btn-primary:active { background: #b71c1c; }
+.btn-ghost { background: transparent; color: #999; }
+
+.record-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: flex; align-items: center; justify-content: space-between; border-left: 4px solid #4caf50; }
+.record-card.urgent { border-left-color: #ff9800; }
+.record-card.expired { border-left-color: #d32f2f; background: #fff5f5; }
+
+.record-info { flex: 1; min-width: 0; }
+.record-name { font-size: 16px; font-weight: 600; }
+.record-item { font-size: 13px; color: #888; margin-top: 2px; }
+.record-id { font-size: 11px; color: #bbb; }
+
+.record-timer { text-align: right; margin-right: 10px; flex-shrink: 0; }
+.timer-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.record-card.expired .timer-value { font-size: 16px; }
+.timer-label { font-size: 11px; color: #999; }
+
+.btn-return { background: #eee; border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; color: #555; flex-shrink: 0; }
+.btn-return:active { background: #ddd; }
+
+.empty { text-align: center; padding: 40px 20px; color: #aaa; }
+.empty-icon { font-size: 48px; margin-bottom: 10px; }
+
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 10px 16px; background: #fff; border-top: 1px solid #eee; display: flex; gap: 10px; max-width: 600px; margin: 0 auto; }
+.btn-export { flex: 1; padding: 12px; background: #1976d2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-export:active { background: #1565c0; }
+.btn-show-all { padding: 12px 16px; background: #fff; color: #666; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; cursor: pointer; white-space: nowrap; }
+
+.toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 24px; border-radius: 20px; font-size: 14px; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 380px) {
+  .timer-value { font-size: 18px; }
+  .record-card { padding: 10px 12px; }
+  .btn-return { padding: 8px 10px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  违禁品倒计时
+  <div class="sub">登记没收物品 · 实时跟踪归还时间</div>
+</div>
+
+<div class="container">
+  <button class="form-toggle" id="formToggle" onclick="toggleForm()">＋ 登记新物品</button>
+
+  <div class="form-card" id="formCard" style="display:none">
+    <h3>登记没收物品</h3>
+    <div class="form-row">
+      <label>学生姓名</label>
+      <input type="text" id="inputName" placeholder="请输入学生姓名" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>学号</label>
+      <input type="text" id="inputId" placeholder="请输入学号" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>没收物品</label>
+      <input type="text" id="inputItem" placeholder="如：手机、充电宝、零食" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>没收时长</label>
+      <select id="inputDuration">
+        <option value="24">24小时</option>
+        <option value="48">48小时</option>
+        <option value="72" selected>72小时（3天）</option>
+        <option value="168">168小时（一周）</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="toggleForm()">取消</button>
+      <button class="btn btn-primary" onclick="submitRecord()">确认登记</button>
+    </div>
+  </div>
+
+  <div id="recordList"></div>
+  <div class="empty" id="emptyState">
+    <div class="empty-icon">📋</div>
+    <div>暂无记录，点击上方按钮开始</div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn-export" onclick="exportXlsx()">导出 xlsx 表格</button>
+  <button class="btn-show-all" id="btnShowAll" onclick="toggleShowAll()">全部记录</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let records = [];
+let showAll = false;
+let formVisible = false;
+
+const DURATION_LABELS = {24: "24小时", 48: "48小时", 72: "72小时", 168: "168小时(一周)"};
+
+function toggleForm() {
+  formVisible = !formVisible;
+  document.getElementById("formCard").style.display = formVisible ? "block" : "none";
+  document.getElementById("formToggle").style.display = formVisible ? "none" : "block";
+  if (!formVisible) {
+    document.getElementById("inputName").value = "";
+    document.getElementById("inputId").value = "";
+    document.getElementById("inputItem").value = "";
+  } else {
+    document.getElementById("inputName").focus();
+  }
+}
+
+async function submitRecord() {
+  const student_name = document.getElementById("inputName").value.trim();
+  const student_id = document.getElementById("inputId").value.trim();
+  const item_name = document.getElementById("inputItem").value.trim();
+  const duration_hours = parseInt(document.getElementById("inputDuration").value);
+
+  if (!student_name || !student_id || !item_name) {
+    showToast("请填写所有必填信息");
+    return;
+  }
+
+  try {
+    const resp = await fetch("/api/records", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({student_name, student_id, item_name, duration_hours})
+    });
+    if (resp.ok) {
+      toggleForm();
+      await fetchRecords();
+      showToast("登记成功！");
+    } else {
+      const err = await resp.json();
+      showToast(err.error || "登记失败");
+    }
+  } catch (e) {
+    showToast("网络错误，请重试");
+  }
+}
+
+async function fetchRecords() {
+  try {
+    const resp = await fetch("/api/records");
+    records = await resp.json();
+    renderRecords();
+  } catch (e) {}
+}
+
+function getTimerClass(remainingMs) {
+  if (remainingMs <= 0) return "expired";
+  if (remainingMs < 3600000) return "urgent";
+  if (remainingMs < 86400000) return "urgent";
+  return "";
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return "可归还";
+  const totalSec = Math.floor(ms / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (d > 0) return d + "天 " + h + "时 " + m + "分";
+  if (h > 0) return h + "时 " + m + "分 " + s + "秒";
+  return m + "分 " + s + "秒";
+}
+
+function renderRecords() {
+  const list = document.getElementById("recordList");
+  const empty = document.getElementById("emptyState");
+  const btnShowAll = document.getElementById("btnShowAll");
+  const now = new Date();
+
+  const filtered = records.filter(r => showAll || r.status === "active");
+
+  if (filtered.length === 0) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+  } else {
+    empty.style.display = "none";
+    list.innerHTML = filtered.map(r => {
+      let remainingMs;
+      if (r.status === "returned") {
+        remainingMs = -1;
+      } else {
+        remainingMs = new Date(r.return_at) - now;
+      }
+      const cls = r.status === "returned" ? "" : getTimerClass(remainingMs);
+      const display = r.status === "returned"
+        ? '<span class="timer-value" style="color:#999">已归还</span><div class="timer-label">&nbsp;</div>'
+        : '<span class="timer-value" data-return-at="' + r.return_at + '">' + formatDuration(remainingMs) + '</span><div class="timer-label">剩余时间</div>';
+
+      return `<div class="record-card ${cls}" id="card-${r.id}">
+        <div class="record-info">
+          <div class="record-name">${esc(r.student_name)}</div>
+          <div class="record-item">${esc(r.item_name)} · ${DURATION_LABELS[r.duration_hours] || r.duration_hours + "小时"}</div>
+          <div class="record-id">学号: ${esc(r.student_id)} · ${r.confiscated_at}</div>
+        </div>
+        <div class="record-timer">${display}</div>
+        ${r.status === "active" ? '<button class="btn-return" onclick="markReturned(' + r.id + ')">已归还</button>' : '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>'}
+      </div>`;
+    }).join("");
+  }
+
+  btnShowAll.textContent = showAll ? "只看未归还" : "全部记录";
+}
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+async function markReturned(id) {
+  try {
+    await fetch("/api/records/" + id + "/return", {method: "PUT"});
+    await fetchRecords();
+    showToast("已标记为归还");
+  } catch (e) {
+    showToast("操作失败，请重试");
+  }
+}
+
+function toggleShowAll() {
+  showAll = !showAll;
+  renderRecords();
+}
+
+function exportXlsx() {
+  window.open("/api/export", "_blank");
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+function updateAllTimers() {
+  const now = new Date();
+  document.querySelectorAll(".timer-value[data-return-at]").forEach(el => {
+    const returnAt = new Date(el.getAttribute("data-return-at"));
+    const ms = returnAt - now;
+    el.textContent = formatDuration(ms);
+    const card = el.closest(".record-card");
+    if (card) {
+      card.className = "record-card " + getTimerClass(ms);
+    }
+  });
+}
+
+setInterval(updateAllTimers, 1000);
+setInterval(fetchRecords, 10000);
+
+fetchRecords();
+</script>
+</body>
+</html>
