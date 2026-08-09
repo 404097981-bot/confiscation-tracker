@@ -45,9 +45,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .btn-return { background: #eee; border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; color: #555; flex-shrink: 0; }
 .btn-return:active { background: #ddd; }
 
-.card-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.card-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
 .btn-adjust { background: #f0f0f0; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: #666; white-space: nowrap; }
 .btn-adjust:active { background: #e0e0e0; }
+.btn-delete { background: transparent; border: none; padding: 4px 6px; font-size: 11px; cursor: pointer; color: #ccc; text-decoration: underline; }
+.btn-delete:hover { color: #d32f2f; }
 
 .empty { text-align: center; padding: 40px 20px; color: #aaa; }
 .empty-icon { font-size: 48px; margin-bottom: 10px; }
@@ -241,7 +243,10 @@ function renderRecords() {
           '<button class="btn-adjust" onclick="adjustDays(' + r.id + ', 1)">+1天</button>' +
           '<button class="btn-return" onclick="markReturned(' + r.id + ')">已归还</button>' +
           '</div>'
-        : '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>';
+        : '<div class="card-actions">' +
+          '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>' +
+          '</div>';
+      const deleteBtn = '<button class="btn-delete" onclick="deleteRecord(' + r.id + ')" title="删除">删除</button>';
 
       return `<div class="record-card ${cls}" id="card-${r.id}">
         <div class="record-info">
@@ -252,6 +257,7 @@ function renderRecords() {
         </div>
         <div class="record-timer">${display}</div>
         ${actionsHtml}
+        ${deleteBtn}
       </div>`;
     }).join("");
   }
@@ -288,6 +294,21 @@ async function adjustDays(id, delta) {
     } else {
       const err = await resp.json();
       showToast(err.error || "操作失败");
+    }
+  } catch (e) {
+    showToast("网络错误，请重试");
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm("确定要删除这条记录吗？此操作不可恢复。")) return;
+  try {
+    const resp = await fetch("/api/records/" + id, {method: "DELETE"});
+    if (resp.ok) {
+      await fetchRecords();
+      showToast("已删除");
+    } else {
+      showToast("删除失败");
     }
   } catch (e) {
     showToast("网络错误，请重试");

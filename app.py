@@ -81,7 +81,7 @@ def create_record():
     if not confiscated_at or not return_date:
         return jsonify({"error": "请选择日期"}), 400
 
-    return_at = return_date + " 17:40"
+    return_at = return_date + "T17:40:00+08:00"
 
     with get_db() as conn:
         cursor = conn.execute(
@@ -122,11 +122,20 @@ def adjust_record(record_id):
             return jsonify({"error": "日期解析失败"}), 400
 
         new_return_date_str = new_return_date.strftime("%Y-%m-%d")
-        new_return_at = new_return_date_str + " 17:40"
+        new_return_at = new_return_date_str + "T17:40:00+08:00"
         conn.execute("UPDATE records SET return_date=?, return_at=? WHERE id=?",
                      (new_return_date_str, new_return_at, record_id))
 
     return jsonify({"ok": True, "return_date": new_return_date_str, "return_at": new_return_at})
+
+
+@app.route("/api/records/<int:record_id>", methods=["DELETE"])
+def delete_record(record_id):
+    with get_db() as conn:
+        conn.execute("DELETE FROM records WHERE id=?", (record_id,))
+        if conn.total_changes == 0:
+            return jsonify({"error": "记录不存在"}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/export")
