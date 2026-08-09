@@ -34,6 +34,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .record-info { flex: 1; min-width: 0; }
 .record-name { font-size: 16px; font-weight: 600; }
 .record-item { font-size: 13px; color: #888; margin-top: 2px; }
+.reason-line { font-size: 12px; color: #e65100; margin-top: 2px; }
 .record-id { font-size: 11px; color: #bbb; }
 
 .record-timer { text-align: right; margin-right: 10px; flex-shrink: 0; }
@@ -43,6 +44,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 .btn-return { background: #eee; border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; color: #555; flex-shrink: 0; }
 .btn-return:active { background: #ddd; }
+
+.card-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.btn-adjust { background: #f0f0f0; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: #666; white-space: nowrap; }
+.btn-adjust:active { background: #e0e0e0; }
 
 .empty { text-align: center; padding: 40px 20px; color: #aaa; }
 .empty-icon { font-size: 48px; margin-bottom: 10px; }
@@ -87,6 +92,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
       <input type="text" id="inputItem" placeholder="如：手机、充电宝、零食" autocomplete="off">
     </div>
     <div class="form-row">
+      <label>没收原因（可选）</label>
+      <input type="text" id="inputReason" placeholder="如：上课玩手机、带零食进教室" autocomplete="off">
+    </div>
+    <div class="form-row">
       <label>没收日期</label>
       <input type="date" id="inputDate" autocomplete="off">
     </div>
@@ -127,6 +136,7 @@ function toggleForm() {
     document.getElementById("inputName").value = "";
     document.getElementById("inputId").value = "";
     document.getElementById("inputItem").value = "";
+    document.getElementById("inputReason").value = "";
     document.getElementById("inputDate").value = "";
     document.getElementById("inputReturnDate").value = "";
   } else {
@@ -140,6 +150,7 @@ async function submitRecord() {
   const student_name = document.getElementById("inputName").value.trim();
   const student_id = document.getElementById("inputId").value.trim();
   const item_name = document.getElementById("inputItem").value.trim();
+  const reason = document.getElementById("inputReason").value.trim();
   const confiscated_at = document.getElementById("inputDate").value;
   const return_date = document.getElementById("inputReturnDate").value;
 
@@ -156,7 +167,7 @@ async function submitRecord() {
     const resp = await fetch("/api/records", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({student_name, student_id, item_name, confiscated_at, return_date})
+      body: JSON.stringify({student_name, student_id, item_name, reason, confiscated_at, return_date})
     });
     if (resp.ok) {
       toggleForm();
@@ -223,14 +234,24 @@ function renderRecords() {
         ? '<span class="timer-value" style="color:#999">已归还</span><div class="timer-label">&nbsp;</div>'
         : '<span class="timer-value" data-return-at="' + r.return_at + '">' + formatDuration(remainingMs) + '</span><div class="timer-label">剩余时间</div>';
 
+      const reasonHtml = r.reason ? '<div class="reason-line">原因: ' + esc(r.reason) + '</div>' : '';
+      const actionsHtml = r.status === "active"
+        ? '<div class="card-actions">' +
+          '<button class="btn-adjust" onclick="adjustDays(' + r.id + ', -1)">-1天</button>' +
+          '<button class="btn-adjust" onclick="adjustDays(' + r.id + ', 1)">+1天</button>' +
+          '<button class="btn-return" onclick="markReturned(' + r.id + ')">已归还</button>' +
+          '</div>'
+        : '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>';
+
       return `<div class="record-card ${cls}" id="card-${r.id}">
         <div class="record-info">
           <div class="record-name">${esc(r.student_name)}</div>
           <div class="record-item">${esc(r.item_name)}</div>
+          ${reasonHtml}
           <div class="record-id">${esc(r.confiscated_at)} ~ ${esc(r.return_date)} · 学号: ${esc(r.student_id)}</div>
         </div>
         <div class="record-timer">${display}</div>
-        ${r.status === "active" ? '<button class="btn-return" onclick="markReturned(' + r.id + ')">已归还</button>' : '<button class="btn-return" style="color:#ccc;pointer-events:none">✓</button>'}
+        ${actionsHtml}
       </div>`;
     }).join("");
   }
@@ -251,6 +272,25 @@ async function markReturned(id) {
     showToast("已标记为归还");
   } catch (e) {
     showToast("操作失败，请重试");
+  }
+}
+
+async function adjustDays(id, delta) {
+  try {
+    const resp = await fetch("/api/records/" + id + "/adjust", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({delta})
+    });
+    if (resp.ok) {
+      await fetchRecords();
+      showToast(delta > 0 ? "已增加一天" : "已减少一天");
+    } else {
+      const err = await resp.json();
+      showToast(err.error || "操作失败");
+    }
+  } catch (e) {
+    showToast("网络错误，请重试");
   }
 }
 

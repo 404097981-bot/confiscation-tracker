@@ -26,6 +26,7 @@ def init_db():
                 student_name TEXT NOT NULL,
                 student_id TEXT NOT NULL,
                 item_name TEXT NOT NULL,
+                reason TEXT NOT NULL DEFAULT '',
                 confiscated_at TEXT NOT NULL,
                 return_date TEXT NOT NULL DEFAULT '',
                 return_at TEXT NOT NULL,
@@ -35,6 +36,10 @@ def init_db():
         """)
         try:
             conn.execute("ALTER TABLE records ADD COLUMN return_date TEXT NOT NULL DEFAULT ''")
+        except:
+            pass
+        try:
+            conn.execute("ALTER TABLE records ADD COLUMN reason TEXT NOT NULL DEFAULT ''")
         except:
             pass
 
@@ -67,6 +72,7 @@ def create_record():
     student_name = data.get("student_name", "").strip()
     student_id = data.get("student_id", "").strip()
     item_name = data.get("item_name", "").strip()
+    reason = data.get("reason", "").strip()
     confiscated_at = data.get("confiscated_at", "").strip()
     return_date = data.get("return_date", "").strip()
 
@@ -79,8 +85,8 @@ def create_record():
 
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO records (student_name, student_id, item_name, confiscated_at, return_date, return_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (student_name, student_id, item_name, confiscated_at, return_date, return_at)
+            "INSERT INTO records (student_name, student_id, item_name, reason, confiscated_at, return_date, return_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (student_name, student_id, item_name, reason, confiscated_at, return_date, return_at)
         )
         record = conn.execute("SELECT * FROM records WHERE id=?", (cursor.lastrowid,)).fetchone()
 
@@ -96,6 +102,32 @@ def return_record(record_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/records/<int:record_id>/adjust", methods=["PUT"])
+def adjust_record(record_id):
+    data = request.get_json()
+    delta = data.get("delta", 0)
+    if delta not in (-1, 1):
+        return jsonify({"error": "无效的调整值"}), 400
+
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM records WHERE id=? AND status='active'", (record_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "记录不存在或已归还"}), 404
+
+        from datetime import datetime as dt
+        try:
+            new_return_date = dt.strptime(row["return_date"], "%Y-%m-%d") + timedelta(days=delta)
+        except:
+            return jsonify({"error": "日期解析失败"}), 400
+
+        new_return_date_str = new_return_date.strftime("%Y-%m-%d")
+        new_return_at = new_return_date_str + " 17:40"
+        conn.execute("UPDATE records SET return_date=?, return_at=? WHERE id=?",
+                     (new_return_date_str, new_return_at, record_id))
+
+    return jsonify({"ok": True, "return_date": new_return_date_str, "return_at": new_return_at})
+
+
 @app.route("/api/export")
 def export_xlsx():
     with get_db() as conn:
@@ -105,7 +137,7 @@ def export_xlsx():
     ws = wb.active
     ws.title = "没收记录"
 
-    headers = ["序号", "学生姓名", "学号", "物品名称", "没收日期", "归还日期", "归还截止时间", "状态"]
+    headers = ["序号", "学生姓名", "学号", "物品名称", "没收原因", "没收日期", "归还日期", "归还截止时间", "状态"]
     ws.append(headers)
 
     status_map = {"active": "未归还", "returned": "已归还"}
@@ -116,6 +148,7 @@ def export_xlsx():
             row["student_name"],
             row["student_id"],
             row["item_name"],
+            row["reason"],
             row["confiscated_at"],
             row["return_date"],
             row["return_at"],
@@ -126,10 +159,11 @@ def export_xlsx():
     ws.column_dimensions["B"].width = 14
     ws.column_dimensions["C"].width = 14
     ws.column_dimensions["D"].width = 18
-    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["E"].width = 20
     ws.column_dimensions["F"].width = 16
-    ws.column_dimensions["G"].width = 20
-    ws.column_dimensions["H"].width = 10
+    ws.column_dimensions["G"].width = 16
+    ws.column_dimensions["H"].width = 20
+    ws.column_dimensions["I"].width = 10
 
     output = BytesIO()
     wb.save(output)
